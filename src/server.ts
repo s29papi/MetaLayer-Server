@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { ZgFile, Indexer } from "@0glabs/0g-ts-sdk"
+import { ZgFile, Indexer, MemData } from "@0glabs/0g-ts-sdk"
 import { ethers } from "ethers";
 import cron from 'node-cron';
 import fs from 'fs';
@@ -42,14 +42,17 @@ const indexer = new Indexer(INDEXER_RPC);
 app.use(express.json({ limit: '50mb' }));
 
 // Helper function to replace detectFileCtxFromName
-// FIX: Added 'fileSize' which was causing 'Cannot convert undefined to a BigInt' during ABI encoding.
+// FIX: Updated to match OGFileCtx interface with proper types
 function detectFileCtxFromName(fileName: string, creator: string, fileSize: number) {
+  const extension = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
+  const mimeType = extension === '.txt' ? 'text/plain' : 'application/octet-stream';
+
   return {
-    fileName,
-    creator,
-    timestamp: Date.now(),
-    description: `File uploaded by ${creator}`,
-    fileSize: BigInt(fileSize) // Crucial fix for Metalayer SDK
+    fileType: mimeType as any,
+    extension: extension as any,
+    dateAdded: BigInt(Date.now()),
+    encrypted: false,
+    creator: creator
   };
 }
 
@@ -104,19 +107,8 @@ app.post("/upload", async (req, res) => {
       fileSize: buffer.length
     });
 
-    // Create proper file object for metalayer
-    const file: any = {
-      size: BigInt(buffer.length),
-      slice: (start: number, end: number) => ({
-        arrayBuffer: async () => {
-          const s = Math.max(0, start | 0);
-          const e = Math.min(buffer.length, end | 0);
-          const view = buffer.subarray(s, e);
-          // Return the *actual* ArrayBuffer slice
-          return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
-        }
-      })
-    };
+    // Use MemData for metalayer upload
+    const file: any = new MemData(buffer);
 
     // The full signer object is passed, and now ctx is complete.
     const resp = await client.uploadWithCtx(indexer, ctx, file, NETWORKS.testnet, signer);
@@ -162,7 +154,7 @@ app.post("/upload", async (req, res) => {
   }
 });
 
-// Simple upload endpoint using only 0g-sdk (fallback) (Fix 2: Use buffer directly for ZgFile)
+// Simple upload endpoint using only 0g-sdk (fallback) (Fix 2: Use MemData)
 app.post("/upload-simple", async (req, res) => {
   try {
     const { fileName, fileData } = req.body;
@@ -178,8 +170,8 @@ app.post("/upload-simple", async (req, res) => {
 
     console.log("Uploading with direct 0g-sdk...");
 
-    // Create ZgFile from buffer directly
-    const file = new ZgFile(buffer);
+    // Create MemData from buffer for upload
+    const file = new MemData(buffer);
 
     const streamId = await indexer.upload(file);
 

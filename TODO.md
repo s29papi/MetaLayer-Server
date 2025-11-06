@@ -1,3 +1,3 @@
-- [x] Fix BigInt error in /upload endpoint by changing file.size to BigInt(buffer.length)
-- [x] Fix ZgFile error in /upload-simple endpoint by passing buffer directly to ZgFile constructor and removing temp file handling
+- [x] Try using MemData for both metalayer and simple uploads
+- [x] Investigate ZgFile fd error - replaced with MemData which supports buffer input
 - [ ] Test the fixes by running node src/client.js
