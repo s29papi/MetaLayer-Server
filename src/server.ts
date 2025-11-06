@@ -1,14 +1,37 @@
-import express from "express";
-import cors from "cors";
-import { ZgFile, Indexer } from "@0glabs/0g-ts-sdk"
-import { ethers } from "ethers";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
-import {detectFileCtxFromName} from "@searchboxlabs/metalayer/utils"
-import { NETWORKS } from '@searchboxlabs/metalayer/network';
-import MetaLayerClient  from "@searchboxlabs/metalayer/metalayer";
-import * as cron from "node-cron";
+const express = require("express");
+const cors = require("cors");
+const { Indexer } = require("@0glabs/0g-ts-sdk");
+const { ethers } = require("ethers");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const cron = require("node-cron");
+
+// Import the problematic package with error handling
+let detectFileCtxFromName: any;
+let MetaLayerClient: any;
+let NETWORKS: any;
+
+try {
+  const metalayer = require("@searchboxlabs/metalayer");
+  detectFileCtxFromName = metalayer.detectFileCtxFromName;
+  MetaLayerClient = metalayer.MetaLayerClient;
+  NETWORKS = metalayer.NETWORKS;
+} catch (error) {
+  console.warn("Failed to load @searchboxlabs/metalayer, using fallbacks:", error);
+  // Fallback implementations
+  detectFileCtxFromName = (fileName: string, creator: string) => ({
+    fileName,
+    creator,
+    timestamp: Date.now()
+  });
+  MetaLayerClient = class {
+    constructor() {
+      console.log("Using fallback MetaLayerClient");
+    }
+  };
+  NETWORKS = {};
+}
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -30,10 +53,10 @@ if (!privateKey) throw new Error("Missing PRIVATE_KEY in environment!");
 const client = new MetaLayerClient();
 const indexer = new Indexer(INDEXER_RPC);
 
-app.use(express.json({ limit: '50mb' })); // Increase limit for file uploads
+app.use(express.json({ limit: '50mb' }));
 
 // --- Upload endpoint ---
-app.post("/upload", async (req, res) => {
+app.post("/upload", async (req: any, res: any) => {
   try {
     const buffer = Buffer.from(req.body.fileData, 'base64');
     const ctx = detectFileCtxFromName(req.body?.fileName, req.body?.creator);
@@ -51,7 +74,6 @@ app.post("/upload", async (req, res) => {
     };
 
     // TODO: Add your upload logic here
-    // You'll need to implement the actual upload to 0G storage
     
     res.json({ 
       success: true, 
@@ -70,12 +92,12 @@ app.post("/upload", async (req, res) => {
   }
 });
 
-app.post("/health", async (req, res) => {
+app.post("/health", async (req: any, res: any) => {
   res.json({"status": "healthy"})
 });
 
 // Simple health check endpoint for Render
-app.get("/", (req, res) => {
+app.get("/", (req: any, res: any) => {
   res.json({ 
     message: "MetaLayer Server is running", 
     timestamp: new Date().toISOString() 

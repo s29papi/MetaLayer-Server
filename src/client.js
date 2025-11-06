@@ -1,6 +1,6 @@
-import fs from 'fs/promises';
+const fs = require('fs/promises');
 
-async function  main() {
+async function main() {
     const buffer = await fs.readFile('./test.txt');
     const base64 = buffer.toString('base64');
 
@@ -16,8 +16,4 @@ async function  main() {
     })
 }
 
-main()  
-
-
-
-
+main()

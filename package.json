@@ -3,16 +3,16 @@
   "version": "1.0.0",
   "description": "Simple Express uploader for @0glabs/0g-ts-sdk suitable for Railway",
   "main": "dist/server.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
-    "dev": "NODE_ENV=development npx tsx src/server.ts",
+    "dev": "ts-node src/server.ts",
     "clean": "rm -rf dist node_modules",
     "reinstall": "npm run clean && npm install"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@0glabs/0g-ts-sdk": "^0.3.3",
@@ -26,13 +26,11 @@
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.5",
-    "@types/multer": "^2.0.0",
-    "@types/node": "^24.10.0",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.10.0",
     "@types/node-cron": "^3.0.11",
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
   }
 }
