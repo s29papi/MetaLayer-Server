@@ -8,6 +8,7 @@ import fs from "fs";
 import {detectFileCtxFromName} from "@searchboxlabs/metalayer/utils"
 // import { NETWORKS } from "@searchboxlabs/metalayer/network";
 import MetaLayerClient  from "@searchboxlabs/metalayer/metalayer";
+import * as cron from "node-cron";
 
 import { NETWORKS } from '@searchboxlabs/metalayer/network';
 
@@ -70,6 +71,22 @@ app.post("/upload", async (req, res) => {
 app.post("/health", async (req, res) => {
   res.json({"status": "healthy"})
 })
+
+// Cron job to call health endpoint every 30 minutes
+cron.schedule('*/30 * * * *', async () => {
+  try {
+    const response = await fetch(`http://localhost:${port}/health`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    const data = await response.json();
+    console.log(`Health check at ${new Date().toISOString()}: ${JSON.stringify(data)}`);
+  } catch (error) {
+    console.error(`Health check failed at ${new Date().toISOString()}:`, error);
+  }
+});
 
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
