@@ -106,7 +106,7 @@ app.post("/upload", async (req, res) => {
 
     // Create proper file object for metalayer
     const file: any = {
-      size: buffer.length,
+      size: BigInt(buffer.length),
       slice: (start: number, end: number) => ({
         arrayBuffer: async () => {
           const s = Math.max(0, start | 0);
@@ -162,13 +162,11 @@ app.post("/upload", async (req, res) => {
   }
 });
 
-// Simple upload endpoint using only 0g-sdk (fallback) (Fix 2: Temp file robustness maintained)
+// Simple upload endpoint using only 0g-sdk (fallback) (Fix 2: Use buffer directly for ZgFile)
 app.post("/upload-simple", async (req, res) => {
-  let tempFilePath: string | null = null;
-  
   try {
     const { fileName, fileData } = req.body;
-    
+
     if (!fileName || !fileData) {
       return res.status(400).json({
         success: false,
@@ -177,19 +175,14 @@ app.post("/upload-simple", async (req, res) => {
     }
 
     const buffer = Buffer.from(fileData, 'base64');
-    
-    // Create temporary file for ZgFile
-    tempFilePath = await createTempFile(buffer, fileName);
-    
+
     console.log("Uploading with direct 0g-sdk...");
-    
-    // Create ZgFile from temporary file path. This relies on the temp file being stable.
-    const file = new ZgFile(tempFilePath);
-    
-    // This is the call that failed with 'this.fd?.read'. If the temp file fix wasn't enough,
-    // this suggests a deeper SDK issue, but we must proceed with the correct usage.
+
+    // Create ZgFile from buffer directly
+    const file = new ZgFile(buffer);
+
     const streamId = await indexer.upload(file);
-    
+
     res.json({
       success: true,
       streamId,
@@ -200,21 +193,11 @@ app.post("/upload-simple", async (req, res) => {
 
   } catch (error) {
     console.error("Simple upload error:", error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: "Simple upload failed",
       message: error instanceof Error ? error.message : "Unknown error"
     });
-  } finally {
-    // Clean up temporary file
-    if (tempFilePath) {
-      try {
-        await fs.promises.unlink(tempFilePath);
-        console.log(`Cleaned up temp file: ${tempFilePath}`);
-      } catch (cleanupError) {
-        console.error("Failed to clean up temp file:", cleanupError);
-      }
-    }
   }
 });
 
