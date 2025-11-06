@@ -75,7 +75,7 @@ app.post("/health", async (req, res) => {
 // Cron job to call health endpoint every 30 minutes
 cron.schedule('*/30 * * * *', async () => {
   try {
-    const response = await fetch(`http://localhost:${port}/health`, {
+    const response = await fetch(`https://metalayer-server.onrender.com/health`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
