@@ -1,0 +1,31 @@
+{
+  "name": "metalayer-server",
+  "version": "1.0.0",
+  "description": "Simple Express uploader for @0glabs/0g-ts-sdk suitable for Railway",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development node src/server.js"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "dependencies": {
+    "@0glabs/0g-ts-sdk": "^0.3.3",
+    "@searchboxlabs/metalayer": "^1.0.11",
+    "ethers": "6.13.1",
+    "express": "^4.18.2",
+    "formidable": "^3.5.4",
+    "multer": "1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.10.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
