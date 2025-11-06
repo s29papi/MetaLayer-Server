@@ -7,10 +7,12 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
-    "dev": "NODE_ENV=development npx tsx src/server.ts"
+    "dev": "NODE_ENV=development npx tsx src/server.ts",
+    "clean": "rm -rf dist node_modules",
+    "reinstall": "npm run clean && npm install"
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@0glabs/0g-ts-sdk": "^0.3.3",
