@@ -2,11 +2,11 @@
   "name": "metalayer-server",
   "version": "1.0.0",
   "description": "Simple Express uploader for @0glabs/0g-ts-sdk suitable for Railway",
-  "main": "server.js",
+  "main": "src/server.ts",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "NODE_ENV=development node src/server.js"
+    "start": "npx tsx src/server.ts",
+    "dev": "NODE_ENV=development npx tsx src/server.ts"
   },
   "engines": {
     "node": "18.x"
