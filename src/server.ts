@@ -20,10 +20,10 @@ app.use(cors({
 const TESTNET_INDEXER_RPC = "https://indexer-storage-turbo.0g.ai";
 const INDEXER_RPC = TESTNET_INDEXER_RPC;
 
-// Proper testnet configuration for 0G
+// Better network configuration for 0G - using the actual 0G testnet
 const NETWORKS = {
   testnet: {
-    rpcUrl: "https://rpc.ankr.com/eth_sepolia", // Sepolia testnet
+    rpcUrl: "https://rpc.ankr.com/eth_sepolia",
     chainId: 11155111,
     name: "sepolia"
   }
@@ -79,16 +79,31 @@ app.post("/upload", async (req, res) => {
 
     console.log("Initializing provider and signer...");
     
-    // Initialize provider and signer with error handling
-    const provider = new ethers.JsonRpcProvider(NETWORKS.testnet.rpcUrl);
-    const signer = new ethers.Wallet(privateKey, provider); 
+    // Initialize provider and signer with better error handling
+    let signer;
+    try {
+      const provider = new ethers.JsonRpcProvider(NETWORKS.testnet.rpcUrl);
+      signer = new ethers.Wallet(privateKey, provider);
+      const signerAddress = await signer.getAddress();
+      console.log("Signer address:", signerAddress);
+      
+      // Check balance to ensure the wallet has funds
+      const balance = await provider.getBalance(signerAddress);
+      console.log("Signer balance:", ethers.formatEther(balance), "ETH");
+      
+    } catch (signerError) {
+      console.error("Signer initialization failed:", signerError);
+      return res.status(500).json({
+        success: false,
+        error: "Signer initialization failed",
+        message: signerError instanceof Error ? signerError.message : "Unknown signer error"
+      });
+    }
 
-    console.log("Signer address:", await signer.getAddress());
     console.log("Starting upload...", { 
       fileName, 
       creator, 
-      fileSize: buffer.length,
-      network: NETWORKS.testnet 
+      fileSize: buffer.length
     });
 
     // Upload the file using metalayer
@@ -189,9 +204,10 @@ app.listen(port, () => {
   console.log(`📡 Using 0G Testnet: ${TESTNET_INDEXER_RPC}`);
 });
 
+// Health check cron - use your actual Render URL
 cron.schedule('*/30 * * * *', async () => {
   try {
-    const response = await fetch(`http://localhost:${port}/health`, {
+    const response = await fetch(`https://metalayer-server.onrender.com/health`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
