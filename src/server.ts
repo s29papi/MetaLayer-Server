@@ -2,7 +2,8 @@ import express from "express";
 import cors from "cors";
 import { ZgFile, Indexer } from "@0glabs/0g-ts-sdk"
 import { ethers } from "ethers";
-import * as cron from "node-cron";
+import cron from 'node-cron';
+
 // Import metalayer components safely
 import * as metalayer from "@searchboxlabs/metalayer";
 
@@ -19,10 +20,10 @@ app.use(cors({
 const TESTNET_INDEXER_RPC = "https://indexer-storage-turbo.0g.ai";
 const INDEXER_RPC = TESTNET_INDEXER_RPC;
 
-// Define NETWORKS manually since the import path doesn't work
+// Proper testnet configuration for 0G
 const NETWORKS = {
   testnet: {
-    rpcUrl: "https://rpc.ankr.com/eth_sepolia", // Using Sepolia testnet
+    rpcUrl: "https://rpc.ankr.com/eth_sepolia", // Sepolia testnet
     chainId: 11155111,
     name: "sepolia"
   }
@@ -32,7 +33,7 @@ const NETWORKS = {
 const privateKey = process.env.PRIVATE_KEY;
 if (!privateKey) throw new Error("Missing PRIVATE_KEY in environment!");
 
-// Initialize clients - use the default export from metalayer
+// Initialize clients
 const client = new metalayer.default();
 const indexer = new Indexer(INDEXER_RPC);
 
@@ -63,6 +64,7 @@ app.post("/upload", async (req, res) => {
     const buffer = Buffer.from(fileData, 'base64');
     const ctx = detectFileCtxFromName(fileName, creator);
     
+    // Create proper file object
     const file: any = {
       size: buffer.length,
       slice: (start: number, end: number) => ({
@@ -75,11 +77,19 @@ app.post("/upload", async (req, res) => {
       })
     };
 
-    // Initialize provider and signer
+    console.log("Initializing provider and signer...");
+    
+    // Initialize provider and signer with error handling
     const provider = new ethers.JsonRpcProvider(NETWORKS.testnet.rpcUrl);
     const signer = new ethers.Wallet(privateKey, provider); 
 
-    console.log("Starting upload...", { fileName, creator, fileSize: buffer.length });
+    console.log("Signer address:", await signer.getAddress());
+    console.log("Starting upload...", { 
+      fileName, 
+      creator, 
+      fileSize: buffer.length,
+      network: NETWORKS.testnet 
+    });
 
     // Upload the file using metalayer
     const resp = await client.uploadWithCtx(indexer, ctx, file, NETWORKS.testnet, signer);
@@ -115,6 +125,47 @@ app.post("/upload", async (req, res) => {
   }
 });
 
+// Simple upload endpoint using only 0g-sdk (fallback)
+app.post("/upload-simple", async (req, res) => {
+  try {
+    const { fileName, fileData } = req.body;
+    
+    if (!fileName || !fileData) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: fileName, fileData"
+      });
+    }
+
+    const buffer = Buffer.from(fileData, 'base64');
+    
+    // Create ZgFile directly
+    const file = new ZgFile({
+      name: fileName,
+      data: buffer
+    });
+
+    console.log("Uploading with direct 0g-sdk...");
+    const streamId = await indexer.upload(file);
+    
+    res.json({
+      success: true,
+      streamId,
+      fileName,
+      fileSize: buffer.length,
+      message: "File uploaded successfully using direct 0g-sdk"
+    });
+
+  } catch (error) {
+    console.error("Simple upload error:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Simple upload failed",
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
 app.post("/health", async (req, res) => {
   res.json({"status": "healthy"})
 });
@@ -124,7 +175,12 @@ app.get("/", (req, res) => {
   res.json({ 
     message: "MetaLayer Server is running", 
     timestamp: new Date().toISOString(),
-    status: "ready"
+    status: "ready",
+    endpoints: {
+      upload: "POST /upload",
+      simpleUpload: "POST /upload-simple", 
+      health: "POST /health"
+    }
   });
 });
 
