@@ -40,24 +40,39 @@ const indexer = new Indexer(INDEXER_RPC);
 app.use(express.json());
 
 app.post("/upload", async (req, res) => {
-  const buffer = Buffer.from(req.body.fileData, 'base64');
-  const ctx = detectFileCtxFromName(req.body?.fileName, req.body?.creator)
-  const file: any = {
-    size: buffer.length,
-    slice: (start: number, end: number) => ({
-        arrayBuffer: async () => {
-        const s = Math.max(0, start | 0);
-        const e = Math.min(buffer.length, end | 0);
-        const view = buffer.subarray(s, e);
-        return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
-        }
-    })
-  }
-  const provider = new ethers.JsonRpcProvider(NETWORKS.mainnet.rpcUrl)
-  const privateKey: any = process.env.PRIVATE_KEY;
-  const signer = new ethers.Wallet(privateKey, provider); 
+  try {
+    const buffer = Buffer.from(req.body.fileData, 'base64');
+    const ctx = detectFileCtxFromName(req.body?.fileName, req.body?.creator)
+    const file: any = {
+      size: buffer.length,
+      slice: (start: number, end: number) => ({
+          arrayBuffer: async () => {
+          const s = Math.max(0, start | 0);
+          const e = Math.min(buffer.length, end | 0);
+          const view = buffer.subarray(s, e);
+          return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
+          }
+      })
+    }
+    const provider = new ethers.JsonRpcProvider(NETWORKS.mainnet.rpcUrl)
+    const privateKey: any = process.env.PRIVATE_KEY;
+    const signer = new ethers.Wallet(privateKey, provider);
 
-  const resp = await client.uploadWithCtx(indexer, ctx, file, NETWORKS.mainnet, signer)
+    const resp = await client.uploadWithCtx(indexer, ctx, file, NETWORKS.mainnet, signer)
+
+    res.json({
+      success: true,
+      message: "Upload successful",
+      data: resp
+    });
+  } catch (error) {
+    console.error("Upload failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Upload failed",
+      error: error.message
+    });
+  }
 });
 
 // Root endpoint
