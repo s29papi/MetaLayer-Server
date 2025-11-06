@@ -54,18 +54,11 @@ app.post("/upload", async (req, res) => {
     })
   }
   const provider = new ethers.JsonRpcProvider(NETWORKS.mainnet.rpcUrl)
-  const privateKey: any = process.env.PRIVATE_KEY;
-  const signer = new ethers.Wallet(privateKey, provider); 
+  const signer = new ethers.Wallet(privateKey, provider);
 
   const resp = await client.uploadWithCtx(indexer, ctx, file, NETWORKS.mainnet, signer)
 
-  // Task:
-  // send a http resp
-  // resp?.error
-  // or
-  // resp?.rootHash
-  // resp?.totalChunks
-  // resp?.txHash
+  res.json(resp);
 });
 
 app.post("/health", async (req, res) => {
