@@ -20,7 +20,7 @@ async function main() {
         const result = await response.json();
         console.log("Metalayer upload result:", result);
 
-        // If metalayer fails, try simple upload with the SAME URL
+        // If metalayer fails, try simple upload
         if (!result.success) {
             console.log("\nTrying simple upload...");
             const simpleResponse = await fetch("https://metalayer-server.onrender.com/upload-simple", {
