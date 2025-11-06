@@ -42,25 +42,26 @@ const indexer = new Indexer(INDEXER_RPC);
 app.use(express.json({ limit: '50mb' }));
 
 // Helper function to replace detectFileCtxFromName
-function detectFileCtxFromName(fileName: string, creator: string) {
+// FIX: Added 'fileSize' which was causing 'Cannot convert undefined to a BigInt' during ABI encoding.
+function detectFileCtxFromName(fileName: string, creator: string, fileSize: number) {
   return {
     fileName,
     creator,
     timestamp: Date.now(),
-    description: `File uploaded by ${creator}`
+    description: `File uploaded by ${creator}`,
+    fileSize: BigInt(fileSize) // Crucial fix for Metalayer SDK
   };
 }
 
 // Helper function to create temporary file for ZgFile
-// NOTE: Must use a unique file name to avoid collisions
 async function createTempFile(buffer: Buffer, fileName: string): Promise<string> {
-  // Use a more unique temp file name
+  // Use a more unique temp file name to prevent conflicts
   const tempFilePath = path.join(os.tmpdir(), `upload_${Date.now()}_${Math.random().toString(36).substring(2, 9)}_${fileName}`);
   await fs.promises.writeFile(tempFilePath, buffer);
   return tempFilePath;
 }
 
-// --- Upload endpoint (Fix 1: BigInt error in metalayer) ---
+// --- Upload endpoint (Fix 1: BigInt error addressed) ---
 app.post("/upload", async (req, res) => {
   let tempFilePath: string | null = null;
   
@@ -75,7 +76,8 @@ app.post("/upload", async (req, res) => {
     }
 
     const buffer = Buffer.from(fileData, 'base64');
-    const ctx = detectFileCtxFromName(fileName, creator);
+    // Pass buffer.length to the context helper
+    const ctx = detectFileCtxFromName(fileName, creator, buffer.length); 
     
     console.log("Initializing provider and signer...");
     
@@ -103,8 +105,6 @@ app.post("/upload", async (req, res) => {
     });
 
     // Create proper file object for metalayer
-    // NOTE: The metalayer SDK expects a `File` object interface, which includes
-    // `slice` that returns an object with an `arrayBuffer` method.
     const file: any = {
       size: buffer.length,
       slice: (start: number, end: number) => ({
@@ -118,15 +118,13 @@ app.post("/upload", async (req, res) => {
       })
     };
 
-    // Corrected call: pass the initialized `signer` object directly.
-    // The previous error "Cannot convert undefined to a BigInt" often happens 
-    // when a required ethers component (like a signer) is missing or incomplete.
+    // The full signer object is passed, and now ctx is complete.
     const resp = await client.uploadWithCtx(indexer, ctx, file, NETWORKS.testnet, signer);
 
     console.log("Upload response:", resp);
 
     // Send response
-    if (!resp || resp.error) { // Check for null/undefined resp and resp.error
+    if (!resp || resp.error) { 
       return res.status(500).json({
         success: false,
         error: resp?.error || "Upload failed (No response or error in response)",
@@ -164,7 +162,7 @@ app.post("/upload", async (req, res) => {
   }
 });
 
-// Simple upload endpoint using only 0g-sdk (fallback) (Fix 2: this.fd?.read is not a function)
+// Simple upload endpoint using only 0g-sdk (fallback) (Fix 2: Temp file robustness maintained)
 app.post("/upload-simple", async (req, res) => {
   let tempFilePath: string | null = null;
   
@@ -181,22 +179,15 @@ app.post("/upload-simple", async (req, res) => {
     const buffer = Buffer.from(fileData, 'base64');
     
     // Create temporary file for ZgFile
-    // ZgFile's underlying implementation expects a file path it can open and read
-    // like a traditional file stream, which is why a temp file is needed.
     tempFilePath = await createTempFile(buffer, fileName);
     
     console.log("Uploading with direct 0g-sdk...");
     
-    // Create ZgFile from temporary file path
-    // The error "this.fd?.read is not a function" means the ZgFile object
-    // didn't successfully create a file descriptor/stream from the path.
+    // Create ZgFile from temporary file path. This relies on the temp file being stable.
     const file = new ZgFile(tempFilePath);
     
-    // ZgFile constructor and upload is a two-step process.
-    // Ensure the ZgFile is properly initialized/opened before upload.
-    // NOTE: The ZgFile may be an older implementation that relies on a synchronous
-    // file open within the constructor or a later synchronous method.
-    // If the path exists and is readable, this should work.
+    // This is the call that failed with 'this.fd?.read'. If the temp file fix wasn't enough,
+    // this suggests a deeper SDK issue, but we must proceed with the correct usage.
     const streamId = await indexer.upload(file);
     
     res.json({
@@ -218,8 +209,6 @@ app.post("/upload-simple", async (req, res) => {
     // Clean up temporary file
     if (tempFilePath) {
       try {
-        // IMPORTANT: The cleanup must happen AFTER the upload to prevent the ZgFile
-        // from being deleted while the indexer is trying to read it.
         await fs.promises.unlink(tempFilePath);
         console.log(`Cleaned up temp file: ${tempFilePath}`);
       } catch (cleanupError) {
@@ -256,8 +245,6 @@ app.listen(port, () => {
 // Health check cron - use your actual Render URL
 cron.schedule('*/30 * * * *', async () => {
   try {
-    // Note: 'fetch' is not globally available in Node.js < v18 without a polyfill.
-    // If your environment is older, replace `fetch` with a library like `axios` or `node-fetch`.
     const response = await fetch(`https://metalayer-server.onrender.com/health`, {
       method: 'POST',
       headers: {
