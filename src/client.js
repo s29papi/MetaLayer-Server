@@ -19,22 +19,6 @@ async function main() {
         
         const result = await response.json();
         console.log("Metalayer upload result:", result);
-
-        // If metalayer fails, try simple upload
-        if (!result.success) {
-            console.log("\nTrying simple upload...");
-            const simpleResponse = await fetch("https://metalayer-server.onrender.com/upload-simple", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    fileName: "test_file_simple.txt", 
-                    fileData: base64
-                }),
-            });
-            
-            const simpleResult = await simpleResponse.json();
-            console.log("Simple upload result:", simpleResult);
-        }
         
     } catch (error) {
         console.error("Upload failed:", error);

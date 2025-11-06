@@ -8,11 +8,8 @@ import fs from "fs";
 import {detectFileCtxFromName} from "@searchboxlabs/metalayer/utils"
 // import { NETWORKS } from "@searchboxlabs/metalayer/network";
 import MetaLayerClient  from "@searchboxlabs/metalayer/metalayer";
-import cron from "node-cron";
-import { NETWORKS } from '@searchboxlabs/metalayer/network';
-import dotenv from "dotenv";
 
-dotenv.config();
+import { NETWORKS } from '@searchboxlabs/metalayer/network';
 
 
 const app = express();
@@ -39,6 +36,8 @@ const indexer = new Indexer(INDEXER_RPC);
 
 app.use(express.json());
 
+
+// --- Upload endpoint ---
 app.post("/upload", async (req, res) => {
   const buffer = Buffer.from(req.body.fileData, 'base64');
   const ctx = detectFileCtxFromName(req.body?.fileName, req.body?.creator)
@@ -58,44 +57,21 @@ app.post("/upload", async (req, res) => {
   const signer = new ethers.Wallet(privateKey, provider); 
 
   const resp = await client.uploadWithCtx(indexer, ctx, file, NETWORKS.mainnet, signer)
-});
 
-// Root endpoint
-app.get("/", (req, res) => {
-  res.json({ 
-    message: "MetaLayer Server is running", 
-    timestamp: new Date().toISOString(),
-    status: "ready",
-    endpoints: {
-      upload: "POST /upload",
-      simpleUpload: "POST /upload-simple", 
-      health: "POST /health"
-    }
-  });
+  // Task:
+  // send a http resp
+  // resp?.error
+  // or
+  // resp?.rootHash
+  // resp?.totalChunks
+  // resp?.txHash
 });
 
 app.post("/health", async (req, res) => {
   res.json({"status": "healthy"})
-});
+})
 
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
-  console.log(`📡 Using 0G Testnet: ${TESTNET_INDEXER_RPC}`);
-  console.log(`🔗 Using Ethereum RPC: ${NETWORKS.testnet.rpcUrl}`);
 });
 
-// Health check cron - use your actual Render URL
-cron.schedule('*/30 * * * *', async () => {
-  try {
-    const response = await fetch(`https://metalayer-server.onrender.com/health`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    const data = await response.json();
-    console.log(`Health check at ${new Date().toISOString()}: ${JSON.stringify(data)}`);
-  } catch (error) {
-    console.error(`Health check failed at ${new Date().toISOString()}:`, error);
-  }
-});
