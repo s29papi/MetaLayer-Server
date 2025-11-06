@@ -3,6 +3,9 @@ import cors from "cors";
 import { ZgFile, Indexer } from "@0glabs/0g-ts-sdk"
 import { ethers } from "ethers";
 import cron from 'node-cron';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 // Import metalayer components safely
 import * as metalayer from "@searchboxlabs/metalayer";
@@ -20,14 +23,18 @@ app.use(cors({
 const TESTNET_INDEXER_RPC = "https://indexer-storage-turbo.0g.ai";
 const INDEXER_RPC = TESTNET_INDEXER_RPC;
 
-// Better network configuration for 0G - using the actual 0G testnet
+// Use free public RPC endpoints that don't require API keys
 const NETWORKS = {
   testnet: {
-    rpcUrl: "https://rpc.ankr.com/eth_sepolia",
+    rpcUrl: "https://eth-sepolia.g.alchemy.com/v2/demo", // Free Alchemy demo endpoint
     chainId: 11155111,
     name: "sepolia"
   }
 };
+
+// Alternative free RPC endpoints:
+// - "https://rpc.sepolia.org" (Official Sepolia)
+// - "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161" (Infura public)
 
 // --- Initialize provider and signer ---
 const privateKey = process.env.PRIVATE_KEY;
@@ -49,8 +56,18 @@ function detectFileCtxFromName(fileName: string, creator: string) {
   };
 }
 
+// Helper function to create temporary file for ZgFile
+async function createTempFile(buffer: Buffer, fileName: string): Promise<string> {
+  const tempDir = os.tmpdir();
+  const tempFilePath = path.join(tempDir, `upload_${Date.now()}_${fileName}`);
+  await fs.promises.writeFile(tempFilePath, buffer);
+  return tempFilePath;
+}
+
 // --- Upload endpoint ---
 app.post("/upload", async (req, res) => {
+  let tempFilePath: string | null = null;
+  
   try {
     const { fileName, creator, fileData } = req.body;
     
@@ -64,19 +81,6 @@ app.post("/upload", async (req, res) => {
     const buffer = Buffer.from(fileData, 'base64');
     const ctx = detectFileCtxFromName(fileName, creator);
     
-    // Create proper file object
-    const file: any = {
-      size: buffer.length,
-      slice: (start: number, end: number) => ({
-        arrayBuffer: async () => {
-          const s = Math.max(0, start | 0);
-          const e = Math.min(buffer.length, end | 0);
-          const view = buffer.subarray(s, e);
-          return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
-        }
-      })
-    };
-
     console.log("Initializing provider and signer...");
     
     // Initialize provider and signer with better error handling
@@ -86,10 +90,6 @@ app.post("/upload", async (req, res) => {
       signer = new ethers.Wallet(privateKey, provider);
       const signerAddress = await signer.getAddress();
       console.log("Signer address:", signerAddress);
-      
-      // Check balance to ensure the wallet has funds
-      const balance = await provider.getBalance(signerAddress);
-      console.log("Signer balance:", ethers.formatEther(balance), "ETH");
       
     } catch (signerError) {
       console.error("Signer initialization failed:", signerError);
@@ -105,6 +105,19 @@ app.post("/upload", async (req, res) => {
       creator, 
       fileSize: buffer.length
     });
+
+    // Create proper file object for metalayer
+    const file: any = {
+      size: buffer.length,
+      slice: (start: number, end: number) => ({
+        arrayBuffer: async () => {
+          const s = Math.max(0, start | 0);
+          const e = Math.min(buffer.length, end | 0);
+          const view = buffer.subarray(s, e);
+          return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
+        }
+      })
+    };
 
     // Upload the file using metalayer
     const resp = await client.uploadWithCtx(indexer, ctx, file, NETWORKS.testnet, signer);
@@ -137,11 +150,22 @@ app.post("/upload", async (req, res) => {
       error: "Upload failed",
       message: error instanceof Error ? error.message : "Unknown error"
     });
+  } finally {
+    // Clean up temporary file
+    if (tempFilePath) {
+      try {
+        await fs.promises.unlink(tempFilePath);
+      } catch (cleanupError) {
+        console.error("Failed to clean up temp file:", cleanupError);
+      }
+    }
   }
 });
 
 // Simple upload endpoint using only 0g-sdk (fallback)
 app.post("/upload-simple", async (req, res) => {
+  let tempFilePath: string | null = null;
+  
   try {
     const { fileName, fileData } = req.body;
     
@@ -154,13 +178,13 @@ app.post("/upload-simple", async (req, res) => {
 
     const buffer = Buffer.from(fileData, 'base64');
     
-    // Create ZgFile directly
-    const file = new ZgFile({
-      name: fileName,
-      data: buffer
-    });
-
+    // Create temporary file for ZgFile (it expects a file path, not buffer)
+    tempFilePath = await createTempFile(buffer, fileName);
+    
     console.log("Uploading with direct 0g-sdk...");
+    
+    // Create ZgFile from temporary file path
+    const file = new ZgFile(tempFilePath);
     const streamId = await indexer.upload(file);
     
     res.json({
@@ -178,6 +202,15 @@ app.post("/upload-simple", async (req, res) => {
       error: "Simple upload failed",
       message: error instanceof Error ? error.message : "Unknown error"
     });
+  } finally {
+    // Clean up temporary file
+    if (tempFilePath) {
+      try {
+        await fs.promises.unlink(tempFilePath);
+      } catch (cleanupError) {
+        console.error("Failed to clean up temp file:", cleanupError);
+      }
+    }
   }
 });
 
@@ -202,6 +235,7 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
   console.log(`📡 Using 0G Testnet: ${TESTNET_INDEXER_RPC}`);
+  console.log(`🔗 Using Ethereum RPC: ${NETWORKS.testnet.rpcUrl}`);
 });
 
 // Health check cron - use your actual Render URL
