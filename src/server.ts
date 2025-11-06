@@ -67,6 +67,7 @@ async function createTempFile(buffer: Buffer, fileName: string): Promise<string>
 // --- Upload endpoint (Fix 1: BigInt error addressed) ---
 app.post("/upload", async (req, res) => {
   let tempFilePath: string | null = null;
+  let fileHandle: any = null;
   
   try {
     const { fileName, creator, fileData } = req.body;
@@ -107,11 +108,13 @@ app.post("/upload", async (req, res) => {
       fileSize: buffer.length
     });
 
-    // Use MemData for metalayer upload
-    const file: any = new MemData(buffer);
+    // Create temp file for ZgFile
+    tempFilePath = await createTempFile(buffer, fileName);
+    fileHandle = await fs.promises.open(tempFilePath, 'r');
+    const file = new ZgFile(fileHandle, buffer.length);
 
     // The full signer object is passed, and now ctx is complete.
-    const resp = await client.uploadWithCtx(indexer, ctx, file, NETWORKS.testnet, signer);
+    const resp = await client.uploadWithCtx(indexer, ctx, file as any, NETWORKS.testnet, signer);
 
     console.log("Upload response:", resp);
 
@@ -142,13 +145,20 @@ app.post("/upload", async (req, res) => {
       message: error instanceof Error ? error.message : "Unknown error"
     });
   } finally {
-    // Clean up temporary file
+    // Clean up temporary file and file handle
     if (tempFilePath) {
       try {
         await fs.promises.unlink(tempFilePath);
         console.log(`Cleaned up temp file: ${tempFilePath}`);
       } catch (cleanupError) {
         console.error("Failed to clean up temp file:", cleanupError);
+      }
+    }
+    if (fileHandle) {
+      try {
+        await fileHandle.close();
+      } catch (closeError) {
+        console.error("Failed to close file handle:", closeError);
       }
     }
   }
@@ -170,10 +180,29 @@ app.post("/upload-simple", async (req, res) => {
 
     console.log("Uploading with direct 0g-sdk...");
 
-    // Create MemData from buffer for upload
-    const file = new MemData(buffer);
+    // Initialize provider and signer for simple upload
+    const provider = new ethers.JsonRpcProvider(NETWORKS.testnet.rpcUrl);
+    const signer = new ethers.Wallet(privateKey, provider);
 
-    const streamId = await indexer.upload(file);
+    // Create temp file for ZgFile
+    const tempFilePath = await createTempFile(buffer, fileName);
+    const fileHandle = await fs.promises.open(tempFilePath, 'r');
+    const file = new ZgFile(fileHandle, buffer.length);
+
+    const streamId = await indexer.upload(file, NETWORKS.testnet.rpcUrl, signer);
+
+    // Clean up temp file and file handle
+    try {
+      await fs.promises.unlink(tempFilePath);
+      console.log(`Cleaned up temp file: ${tempFilePath}`);
+    } catch (cleanupError) {
+      console.error("Failed to clean up temp file:", cleanupError);
+    }
+    try {
+      await fileHandle.close();
+    } catch (closeError) {
+      console.error("Failed to close file handle:", closeError);
+    }
 
     res.json({
       success: true,

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Simple Express uploader for @0glabs/0g-ts-sdk suitable for Railway",
   "main": "dist/server.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
