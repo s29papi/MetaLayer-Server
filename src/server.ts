@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { ZgFile, Indexer } from "@0glabs/0g-ts-sdk"
 import { ethers } from "ethers";
 import multer from "multer";
@@ -13,6 +14,12 @@ import { NETWORKS } from '@searchboxlabs/metalayer/network';
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Enable CORS for specific origins
+app.use(cors({
+  origin: ['https://metalayer-indexer.lovable.app/app'],
+  credentials: true
+}));
 
 // --- Network configuration ---
 const TESTNET_INDEXER_RPC = "https://indexer-storage-turbo.0g.ai";
@@ -60,6 +67,9 @@ app.post("/upload", async (req, res) => {
   // resp?.txHash
 });
 
+app.post("/health", async (req, res) => {
+  res.json({"status": "healthy"})
+})
 
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
