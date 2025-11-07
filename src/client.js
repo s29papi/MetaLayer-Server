@@ -12,7 +12,7 @@ async function main() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 fileName: "test_file.txt", 
-                creator: "0x330cA32b71b81Ea2b1D3a5C391C5cFB6520E0A10",
+                creator: "0xF709Fd15664A25009ffda6694617f18fD709C000",
                 fileData: base64
             }),
         });

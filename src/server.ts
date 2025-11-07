@@ -20,7 +20,7 @@ const port = process.env.PORT || 3000;
 
 // Enable CORS for specific origins
 app.use(cors({
-  origin: ['https://metalayer-indexer.lovable.app/app'],
+  origin: ['https://metalayer-indexer.lovable.app'],
   credentials: true
 }));
 
